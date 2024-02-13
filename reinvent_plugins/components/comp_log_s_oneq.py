@@ -1,0 +1,44 @@
+"""Run an external scoring subprocess
+
+Run external process: provide specific command line parameters when needed
+pass on the SMILES as a series of strings at the end.
+"""
+
+from __future__ import annotations
+from .base_oneq import BaseOneq
+
+
+__all__ = ["LogSoneq"]
+
+from dataclasses import dataclass
+from .add_tag import add_tag
+
+
+bearer = "Bearer eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJpbTE5VWVMaG11eFZLSTdHNUkzbF9KSXFLam5hRFVHdWxITmk1Y2N4REY4In0.eyJleHAiOjE3MDcxMjM2NzgsImlhdCI6MTcwNzEyMzM3OCwiYXV0aF90aW1lIjoxNzA3MTIwNzE3LCJqdGkiOiJjMzk4Nzc5Zi05NTYyLTQ3ZDQtODRhYy1lZGVlODI2Y2JkNDQiLCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJpb2NhZC5ydS9hdXRoL3JlYWxtcy9NU0F6dXJlIiwiYXVkIjpbInlsYWIyLmJpb2NhZC5ydSIsImNoZW1zb2Z0LmJpb2NhZC5ydSIsInlsYWIuYmlvY2FkLnJ1Iiwib25lLXEuYmlvY2FkLnJ1IiwibWwtY2hhdC5iaW9jYWQucnUiLCJhYnNjYW4uYmlvY2FkLnJ1IiwiYWNjb3VudCIsImtla3VsZS5iaW9jYWQucnUtcWEiXSwic3ViIjoiZjMwYTc4OGYtNmEwOS00NTg0LTllZDMtYmYxMzMxYTI2MjIxIiwidHlwIjoiQmVhcmVyIiwiYXpwIjoia2VrdWxlLmJpb2NhZC5ydSIsInNlc3Npb25fc3RhdGUiOiJiNjM4YjAyMC1kMzc1LTQ3ZTItYmU1YS0wNTI4NTE0YWUxNzgiLCJhY3IiOiIxIiwiYWxsb3dlZC1vcmlnaW5zIjpbImh0dHBzOi8vY29tYi5iaW9jYWQucnUiLCJodHRwczovL2NoZW1sYWIuYmlvY2FkLnJ1IiwiaHR0cHM6Ly9tZGUuYmlvY2FkLnJ1Il0sInJlYWxtX2FjY2VzcyI6eyJyb2xlcyI6WyJvZmZsaW5lX2FjY2VzcyIsInVtYV9hdXRob3JpemF0aW9uIl19LCJyZXNvdXJjZV9hY2Nlc3MiOnsia2VrdWxlLmJpb2NhZC5ydSI6eyJyb2xlcyI6WyJ1c2VyIl19LCJ5bGFiMi5iaW9jYWQucnUiOnsicm9sZXMiOlsidXNlciJdfSwiY2hlbXNvZnQuYmlvY2FkLnJ1Ijp7InJvbGVzIjpbIk9ic2VydmVyIl19LCJ5bGFiLmJpb2NhZC5ydSI6eyJyb2xlcyI6WyJ1c2VyIl19LCJvbmUtcS5iaW9jYWQucnUiOnsicm9sZXMiOlsidXNlciJdfSwibWwtY2hhdC5iaW9jYWQucnUiOnsicm9sZXMiOlsidXNlciJdfSwiYWJzY2FuLmJpb2NhZC5ydSI6eyJyb2xlcyI6WyJ1c2VyIl19LCJhY2NvdW50Ijp7InJvbGVzIjpbIm1hbmFnZS1hY2NvdW50IiwibWFuYWdlLWFjY291bnQtbGlua3MiLCJ2aWV3LXByb2ZpbGUiXX0sImtla3VsZS5iaW9jYWQucnUtcWEiOnsicm9sZXMiOlsibW9sZWN1bGVfdXBsb2FkZXIiLCJ1c2VyIl19fSwic2NvcGUiOiJvcGVuaWQgcHJvZmlsZSBlbWFpbCIsIm9iamVjdF9ndWlkIjoiYjYxODJlNDctNjFmNS00N2MzLThmNTctN2M2YjhjMmY3YWE4IiwiZW1haWxfdmVyaWZpZWQiOmZhbHNlLCJuYW1lIjoi0KLQuNC80YPRgCDQk9C40LzQsNC00LjQtdCyIiwicHJlZmVycmVkX3VzZXJuYW1lIjoiZ2ltYWRpZXZ0ciIsImdpdmVuX25hbWUiOiLQotC40LzRg9GAIiwiZmFtaWx5X25hbWUiOiLQk9C40LzQsNC00LjQtdCyIiwiZW1haWwiOiJnaW1hZGlldnRyQGJpb2NhZC5ydSJ9.TzU5JQkRT03Pi7mlCtEN6YqTIMTJVI6KCvIFJ7VjFjMkcoO3MiOtW_lBbu-UiZN8Xp1dDx8JhzpfMaURF-niqlbW-zcmClcgco6l9QG6Bc0ENAo7LLG87Uxxpm5A7uWy9-0k3PsUawlUm4lbGfNMMpCUw1FToFSthzNJWvCXKKhsva0kPMLm7opeFDK1g4V-y3PlLdS3wQcf_qgKh8Wyqjlc3JWmlVNr9cctfwOuTTfBvtS-kI_D3nvB4mseZleqVKTgNtWImPpVsCAFvvcSph8YvjxbECfuCXl5cdf-sQclfxn_XES63O8YiEXmS6mbbwTjFNywbdezwIi0aX3cwg"
+
+
+@add_tag("__parameters")
+@dataclass
+class Parameters:
+    """Parameters for the scoring component
+
+    Note that all parameters are always lists because components can have
+    multiple endpoints and so all the parameters from each endpoint is
+    collected into a list.  This is also true in cases where there is only one
+    endpoint.
+    """
+
+    #executable: List[str]
+    #args: List[str]
+
+
+@add_tag("__component")
+class LogSoneq(BaseOneq):
+
+    def __init__(self, params: Parameters):
+        super().__init__()
+        self.params = params
+        self.tasks = []
+        self.field = "logs"
+        self.pipeline = "solubility"
+        self.classification = False
