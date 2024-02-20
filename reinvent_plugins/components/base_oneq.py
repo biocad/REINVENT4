@@ -10,6 +10,7 @@ from loguru import logger
 from requests import get, post
 
 from .component_results import ComponentResults
+from tqdm import tqdm
 
 
 class BaseOneq:
@@ -24,15 +25,19 @@ class BaseOneq:
         self.headers = {"Authorization": self.bearer}
 
     def __call__(self, smilies: List[str]) -> np.array:
-        logger.info(f"module {self.pipeline} working")
+        logger.info(f"module {self.pipeline} setting tasks")
         scores = []
         tasks = []
-        for smi in smilies:
-            logger.info(f"smi{smi}")
+        for smi in tqdm(smilies):
+            logger.debug(f"smi{smi}")
             task_id = self.set_task(smi)
-            logger.info(f"smi{smi}, taskid {task_id}")
+            logger.debug(f"smi{smi}, taskid {task_id}")
             tasks.append(task_id)
-        scores.append(np.array([self.get_task(task_id=task) for task in tasks]))
+        res = []
+        logger.info(f"module {self.pipeline} getting tasks")
+        for task in tqdm(tasks):
+            res.append(self.get_task(task_id=task))
+        scores.append(np.array(res))
 
         return ComponentResults(scores)
 
@@ -45,7 +50,7 @@ class BaseOneq:
             with open(tmp.name) as file:
                 response = post(f"https://chemlab-back.dev.net.biocad.ru/v1/molprop/run-pipeline/{self.pipeline}/",
                                 headers=self.headers, files={"file": file})
-            logger.info(response)
+            logger.debug(response)
             if response.status_code == 200:
                 break
             sleep(10)
@@ -62,9 +67,9 @@ class BaseOneq:
             if self.status_ok(task_id=task_id):
                 result = get(f"https://chemlab-back.dev.net.biocad.ru/v1/molprop/task/{task_id}/result/",
                              headers=self.headers)
-                logger.info(f"{task_id} not ready, sleep for 10 sec")
+                logger.debug(f"{task_id} not ready, sleep for 10 sec")
                 if bool(result.json()):
-                    logger.info(result.json())
+                    logger.debug(result.json())
                     if self.classification:
                         return np.int(result.json()[0][self.field])
                     else:
