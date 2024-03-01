@@ -51,6 +51,7 @@ class BaseOneq:
                 response = post(f"https://chemlab-back.dev.net.biocad.ru/v1/molprop/run-pipeline/{self.pipeline}/",
                                 headers=self.headers, files={"file": file})
             logger.debug(response)
+            logger.debug(response.text)
             if response.status_code == 200:
                 break
             sleep(10)
