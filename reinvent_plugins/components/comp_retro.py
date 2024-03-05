@@ -5,7 +5,7 @@ import os
 from dataclasses import dataclass
 from enum import Enum
 from time import sleep
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Dict
 
 import numpy as np
 from loguru import logger
@@ -17,6 +17,7 @@ from .component_results import ComponentResults
 
 __all__ = ["Retro"]
 
+
 class Status(Enum):
     UNKNOWN = 0
     WAIT = 1
@@ -27,15 +28,16 @@ class Status(Enum):
 @add_tag("__parameters")
 @dataclass
 class Parameters:
-    pass
+    bearer: List[str]
 
 
 @add_tag("__component")
 class Retro:
 
-    def __init__(self, bearer: Optional[str] = None):
-        if bearer:
-            self.bearer = bearer
+    def __init__(self, params: Parameters):
+        self.params = params
+        if self.params.bearer:
+            self.bearer = self.params.bearer
         elif bearer := os.getenv("BEARER"):
             self.bearer = bearer
         else:
@@ -50,7 +52,10 @@ class Retro:
         tasks = []
         for smi in tqdm(smilies):
             logger.debug(f"smi{smi}")
-            task_id = self.set_task(smi)
+            if history := self.search(smi=smi):
+                task_id = history['items'][0]['id']
+            else:
+                task_id = self.set_task(smi)
             logger.debug(f"smi{smi}, taskid {task_id}")
             tasks.append(task_id)
         res = []
@@ -96,11 +101,23 @@ class Retro:
         # get results
         for _ in range(give_up_time // sleep_time):
             if self.status_ok(task_id=task_id) == Status.OK:
-                result = json.loads(get(f"https://chemlab-back.dev.net.biocad.ru/v1/retrosynth/calc/{task_id}/",
-                             headers=self.headers).text)
+                result = get(f"https://chemlab-back.dev.net.biocad.ru/v1/retrosynth/calc/{task_id}/",
+                             headers=self.headers).json()
                 res = result['calcs'][0]['statistics']['is_molecule_solved']
                 return np.int(res)
             logger.debug(f"task {task_id} is not ready, waiting {sleep_time} sec")
             sleep(sleep_time)
         return np.nan
+
+    def search(self, smi: Optional[str] = None, mde_id: Optional[int] = None, user_id: Optional[str] = None,
+               offset: Optional[int] = None) -> Optional[Dict]:
+        # get results
+        data = {"smiles": smi, "mde_id": mde_id, "user": user_id, "offset": offset}
+        response = get(f"https://chemlab-back.dev.net.biocad.ru/v1/retrosynth/calc/history/",
+                       headers=self.headers, params=data)
+        if response.status_code == 200:
+            result = response.json()
+            logger.debug(result)
+            if result.get('items'):
+                return result['items'][0]['id']
 
